@@ -1,0 +1,25 @@
+import groovy.json.JsonSlurper
+import org.slf4j.LoggerFactory
+
+def logger = LoggerFactory.getLogger(this.class)
+def issueKey = issue.key
+
+def issueResp = get("/rest/api/3/issue/${issueKey}?expand=changelog").asString()
+assert issueResp.status == 200
+
+def jsonResponse = new JsonSlurper().parseText(issueResp.body)
+if (jsonResponse.changelog.histories.any { it.items.any { item -> item.field == "Resolution team" && item.toString == "Seguridad" } }) {
+    def resp = post("/rest/api/3/issue/${issueKey}/notify")
+        .header("Content-Type", "application/json")
+        .body([
+            subject: "Cambio en el equipo de resolución",
+            textBody: "El ticket ${issueKey} ahora está asignado al equipo de Seguridad."
+        ])
+        .asString()
+
+    if (resp.status == 204) {
+        logger.info "Notificación enviada correctamente."
+    } else {
+        logger.error "Error al enviar la notificación: ${resp.body}"
+    }
+}
